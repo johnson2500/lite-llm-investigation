@@ -1,0 +1,10 @@
+[project]
+name = "litellm-investigation"
+version = "0.1.0"
+description = "Investigation into LiteLLM"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "litellm[proxy]>=1.80.10",
+    "ollama>=0.6.1",
+]
