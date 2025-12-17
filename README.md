@@ -20,3 +20,7 @@ response = client.chat.completions.create(model="ollama/llama3", messages = [
 
 print(response)
 ```
+
+# main.py 
+
+Focuses on the base functionlity of lite LLM.

@@ -1,3 +1,4 @@
+# This file is a simple example of how to use LiteLLM to perform a completion.
 from litellm import completion
 import litellm
 
@@ -13,7 +14,7 @@ def simple_completion(prompt):
     for chunk in response:
         print(chunk.choices[0].delta.content, end="", flush=True)
 
-
+# This function is a simple example of how to use LiteLLM to perform a completion and track the cost.
 def track_cost(prompt):
     def track_cost_callback(
         kwargs,                 # kwargs to completion
@@ -44,5 +45,4 @@ def track_cost(prompt):
         print(chunk.choices[0].delta.content, end="", flush=True)
 
 track_cost("Hello, how are you?")
-
 simple_completion("Hello, how are you?")
