@@ -1,4 +1,4 @@
-# Proxy.py
+# lite_llm_proxy.py
 Demonstrates the proxied version of liteLLM to track projects and users.
 
 ## Starting the server
