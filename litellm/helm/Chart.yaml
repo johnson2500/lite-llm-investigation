@@ -1,0 +1,15 @@
+apiVersion: v2
+name: litellm
+description: A Helm chart for deploying LiteLLM proxy service with optional Streamlit UI
+type: application
+version: 0.2.0
+appVersion: "v1.80.5-stable"
+keywords:
+  - litellm
+  - llm
+  - proxy
+  - ai
+  - streamlit
+maintainers:
+  - name: LiteLLM Team
+

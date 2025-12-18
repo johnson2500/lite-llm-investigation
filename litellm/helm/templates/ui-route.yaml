@@ -1,0 +1,29 @@
+{{- if and .Values.ui.enabled .Values.ui.route.enabled -}}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "litellm.fullname" . }}-ui
+  labels:
+    {{- include "litellm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ui
+  {{- with .Values.ui.route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ui.route.host }}
+  host: {{ .Values.ui.route.host }}
+  {{- end }}
+  to:
+    kind: Service
+    name: {{ include "litellm.fullname" . }}-ui
+    weight: 100
+  port:
+    targetPort: http
+  {{- if .Values.ui.route.tls }}
+  tls:
+    {{- toYaml .Values.ui.route.tls | nindent 4 }}
+  {{- end }}
+  wildcardPolicy: None
+{{- end }}
+

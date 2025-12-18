@@ -1,0 +1,12 @@
+{{- if .Values.ui.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "litellm.fullname" . }}-ui-config
+  labels:
+    {{- include "litellm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ui
+data:
+  LITELLM_URL: {{ printf "http://%s:%d" (include "litellm.fullname" .) (int .Values.service.port) | quote }}
+{{- end }}
+

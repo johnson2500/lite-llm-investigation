@@ -1,10 +1,55 @@
-# Python-generated files
+# Python
 __pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
 .venv
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Helm
+helm/charts/
+helm/Chart.lock
+*.tgz
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+*.local
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+
+# Secrets (never commit!)
+*secret*.yaml
+*password*.txt
+credentials.json
+
