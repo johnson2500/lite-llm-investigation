@@ -6,10 +6,14 @@ st.title("LiteLLM Model Browser")
 
 # Get LiteLLM URL from environment variable, secrets, or default
 LITELLM_URL = "http://litellm:4000"
+LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", "")
 
 def fetch_models(endpoint):
     try:
-        res = requests.get(f"{endpoint}/models")
+        headers = {}
+        if LITELLM_API_KEY:
+            headers["Authorization"] = f"Bearer {LITELLM_API_KEY}"
+        res = requests.get(f"{endpoint}/models", headers=headers)
         res.raise_for_status()
         return res.json().get("data", [])
     except Exception as e:
