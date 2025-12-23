@@ -4,6 +4,7 @@ metadata:
   name: {{ include "litellm.fullname" . }}
   labels:
     {{- include "litellm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -13,4 +14,5 @@ spec:
       name: http
   selector:
     {{- include "litellm.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api
 

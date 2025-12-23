@@ -2,7 +2,7 @@ apiVersion: v2
 name: litellm
 description: A Helm chart for deploying LiteLLM proxy service with optional Streamlit UI
 type: application
-version: 0.2.0
+version: 0.3.0
 appVersion: "v1.80.5-stable"
 keywords:
   - litellm
@@ -10,6 +10,13 @@ keywords:
   - proxy
   - ai
   - streamlit
+  - postgresql
+  - pgvector
 maintainers:
   - name: LiteLLM Team
 
+dependencies:
+  - name: pgvector
+    version: "0.5.2"
+    repository: "file://charts/pgvector"
+    condition: pgvector.enabled

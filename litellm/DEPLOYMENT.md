@@ -1,347 +1,211 @@
-# LiteLLM Unified Deployment Guide
-
-Complete guide for deploying LiteLLM proxy with Streamlit UI using a single Helm chart.
-
-## Overview
-
-This deployment includes:
-- **LiteLLM Proxy** - Unified API for multiple LLM providers
-- **Streamlit UI** - Web interface for browsing and testing models
-- **OpenShift Routes** - Auto-generated URLs for both services
+# LiteLLM Deployment Guide
 
 ## Quick Start
 
-### 1. Build the UI Image
+Deploy using the Makefile from the `litellm/` directory:
 
 ```bash
-cd /Users/rjjohnso/Documents/code/POC/lite-llm-investigation/apps/ui
+cd litellm
 
-# For OpenShift
-oc new-build --name litellm-ui --binary --strategy docker -n litellm
-oc start-build litellm-ui --from-dir=. --follow -n litellm
-
-# OR for Docker/Podman with external registry
-podman build -t quay.io/your-org/litellm-ui:latest -f Containerfile .
-podman push quay.io/your-org/litellm-ui:latest
-```
-
-### 2. Deploy Everything
-
-```bash
-cd /Users/rjjohnso/Documents/code/POC/lite-llm-investigation/litellm
-
-# Simple one-command deployment
+# Deploy everything (LiteLLM + UI + PostgreSQL)
 make install
 
-# Or with custom settings
-make install NAMESPACE=my-litellm UI_IMAGE_TAG=v1.0.0
+# Or deploy to a custom namespace
+make install NAMESPACE=my-namespace
 ```
 
-### 3. Access the Services
+## Main Commands
+
+| Command | Description |
+|---------|-------------|
+| `make install` | Build UI image and deploy all services |
+| `make install-api-only` | Deploy only LiteLLM (no Streamlit UI) |
+| `make uninstall` | Remove the deployment |
+| `make upgrade` | Apply configuration changes |
+| `make status` | Show deployment status |
+| `make logs` | View logs for all services |
+| `make urls` | Display service URLs |
+| `make clean` | Uninstall and delete namespace |
+
+Run `make help` for the full list of commands.
+
+## Accessing the UI
+
+Once deployed, check the pods are running:
 
 ```bash
-# Get the routes
+oc get pods -n litellm
+```
+
+Then get the route URLs:
+
+```bash
 oc get routes -n litellm
-
-# Get URLs
-LITELLM_API=$(oc get route litellm -n litellm -o jsonpath='{.spec.host}')
-UI_URL=$(oc get route litellm-ui -n litellm -o jsonpath='{.spec.host}')
-
-echo "LiteLLM API: https://$LITELLM_API"
-echo "UI:          https://$UI_URL"
-
-# Test the API
-curl https://$LITELLM_API/health
-
-# Open UI in browser
-open "https://$UI_URL"
 ```
 
-## Configuration Options
+- **LiteLLM Admin UI**: `https://<litellm-route>/ui` — Access the admin panel with username `admin` and your configured `masterKey` as the password.
+- **Streamlit UI**: `https://<litellm-ui-route>` — Open the custom model browser interface.
 
-### Deploy LiteLLM Only (No UI)
+Once the deployment is complete, access the LiteLLM pod and navigate to the above URLs in your browser. You should see a screen similar to:
+
+<img src='../litellm-ui.png'>
+
+To access the management console, click on "LiteLLM Admin Panel UI". Log in with `admin` as the username and your `masterKey` as the password.
+
+<img src='../login-ui.png'>
+
+Once logged in, all the data is stored in the PostgreSQL database.
+
+---
+
+## Architecture
+
+The deployment consists of three main components that work together:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    OpenShift Namespace                       │
+│                                                              │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐   │
+│  │   LiteLLM    │◄───│  Streamlit   │    │  PostgreSQL  │   │
+│  │   Proxy      │    │     UI       │    │  (pgvector)  │   │
+│  │  Port 4000   │    │  Port 8501   │    │  Port 5432   │   │
+│  └──────┬───────┘    └──────────────┘    └──────▲───────┘   │
+│         │                                       │            │
+│         └───────────────────────────────────────┘            │
+│                      DATABASE_URL                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Data Flow:**
+1. **Streamlit UI** calls the LiteLLM API to fetch and display available models
+2. **LiteLLM Proxy** handles all LLM requests and stores metadata in PostgreSQL
+3. **PostgreSQL** persists API keys, teams, budgets, and usage logs
+
+---
+
+## PostgreSQL Database (pgvector)
+
+The PostgreSQL database is the backbone for LiteLLM's enterprise features. Without it, LiteLLM runs in stateless mode with limited functionality.
+
+### What Gets Stored
+
+| Data | Description |
+|------|-------------|
+| **Virtual API Keys** | Generated keys for users/applications to access the proxy |
+| **Teams & Users** | Organization structure with assigned members |
+| **Budgets** | Spending limits per user, team, or API key |
+| **Spend Logs** | Usage tracking and cost attribution |
+| **Model Access** | Which keys/teams can access which models |
+
+### Database Configuration
+
+The database connection is configured in `helm/values.yaml`:
+
+```yaml
+pgvector:
+  enabled: true
+  secret:
+    user: postgres
+    password: litellm_password  # Change in production!
+    dbname: litellm
+    host: pgvector
+    port: "5432"
+```
+
+LiteLLM connects using the `DATABASE_URL` environment variable, which is automatically constructed from these values.
+
+### Disabling the Database
+
+For simple testing without persistence:
+
+```yaml
+pgvector:
+  enabled: false
+```
+
+> **Note:** Without a database, virtual keys, spend tracking, and team management will not be available.
+
+---
+
+## Streamlit UI
+
+The Streamlit UI is a custom web application that provides a simple interface to browse models available through the LiteLLM proxy.
+
+### How It Works
+
+1. **Connects to LiteLLM** — The UI is configured to call `http://litellm:4000` (internal service DNS)
+2. **Fetches Models** — Calls the `/models` endpoint to retrieve available LLMs
+3. **Displays Results** — Shows model information in a user-friendly format
+
+### Environment Variables
+
+The UI receives these from the Helm deployment:
+
+| Variable | Purpose |
+|----------|---------|
+| `LITELLM_URL` | Internal URL to the LiteLLM service |
+| `LITELLM_API_KEY` | API key for authenticated requests |
+| `LITELLM_MASTER_KEY` | Master key for admin operations |
+
+### Customizing the UI
+
+The UI source code is in `apps/ui/main.py`. To modify it:
 
 ```bash
-helm install litellm . \
-  --namespace litellm \
-  --create-namespace \
-  --set ui.enabled=false
+# Edit the code
+cd apps/ui
+vim main.py
+
+# Rebuild the image
+oc start-build litellm-ui --from-dir=. --follow -n litellm
+
+# Restart the deployment
+oc rollout restart deployment/litellm-ui -n litellm
 ```
 
-### Custom Configuration
+---
 
-Create a `custom-values.yaml`:
+## Configuration
+
+Edit `helm/values.yaml` to customize models, credentials, and settings, then run:
+
+```bash
+make upgrade
+```
+
+### Key Configuration Options
 
 ```yaml
 litellm:
-  debug: true
+  masterKey: "your-secure-key"    # Admin UI password
+  apiKey: "sk-your-api-key"       # API access key
   config:
     model_list:
-      - model_name: gpt-4
-        litellm_params:
-          model: azure/gpt-4
-          api_base: https://your-endpoint.openai.azure.com/
-          api_key: ${AZURE_API_KEY}
       - model_name: llama3
         litellm_params:
           model: ollama/llama3
           api_base: http://ollama:11434
-
-ui:
-  enabled: true
-  resources:
-    limits:
-      cpu: 1000m
-      memory: 1Gi
-    requests:
-      cpu: 500m
-      memory: 512Mi
 ```
 
-Deploy with:
-
-```bash
-helm install litellm . -f custom-values.yaml --namespace litellm --create-namespace
-```
-
-### Enable Autoscaling
-
-```yaml
-autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
-```
-
-## Makefile Commands
-
-The Makefile provides simple commands for all operations:
-
-```bash
-# Show all available commands
-make help
-
-# Install everything (builds UI and deploys both services)
-make install
-
-# Install only LiteLLM API (no UI)
-make install-api-only
-
-# Uninstall
-make uninstall
-
-# Check status
-make status
-
-# View logs
-make logs
-make logs-api
-make logs-ui
-
-# Get service URLs
-make urls
-
-# Test the API
-make test
-
-# Complete cleanup (uninstall + delete namespace)
-make clean
-```
-
-### Makefile Variables
-
-You can customize the deployment with variables:
-
-```bash
-# Custom namespace
-make install NAMESPACE=my-litellm
-
-# Custom image repository
-make install UI_IMAGE_REPO=quay.io/myorg/litellm-ui
-
-# Custom image tag
-make install UI_IMAGE_TAG=v1.0.0
-
-# Combine multiple variables
-make install NAMESPACE=production UI_IMAGE_TAG=stable
-```
-
-## Updating
-
-### Update LiteLLM Configuration
-
-```bash
-# Edit helm/values.yaml
-
-# Apply changes
-helm upgrade litellm . --namespace litellm
-```
-
-### Update UI Code
-
-```bash
-cd ../apps/ui
-
-# Make changes to main.py
-
-# Rebuild image
-oc start-build litellm-ui --from-dir=. --follow -n litellm
-
-# Restart deployment
-kubectl rollout restart deployment/litellm-ui -n litellm
-```
-
-### Upgrade Helm Release
-
-```bash
-helm upgrade litellm . \
-  --namespace litellm \
-  -f custom-values.yaml
-```
-
-## Monitoring
-
-### Check Status
-
-```bash
-# All resources
-kubectl get all -n litellm
-
-# Specific components
-kubectl get deployment,svc,route -n litellm
-
-# Pod status
-kubectl get pods -n litellm -w
-```
-
-### View Logs
-
-```bash
-# LiteLLM logs
-kubectl logs -n litellm -l app.kubernetes.io/name=litellm -f
-
-# UI logs
-kubectl logs -n litellm -l app.kubernetes.io/component=ui -f
-
-# All logs
-kubectl logs -n litellm --all-containers -f
-```
-
-### Describe Resources
-
-```bash
-# Deployments
-kubectl describe deployment litellm -n litellm
-kubectl describe deployment litellm-ui -n litellm
-
-# Routes
-oc describe route litellm -n litellm
-oc describe route litellm-ui -n litellm
-```
+---
 
 ## Troubleshooting
 
-### UI Cannot Connect to LiteLLM
-
+### Check Pod Status
 ```bash
-# Check ConfigMap
-kubectl get configmap litellm-ui-config -n litellm -o yaml
-
-# Test from UI pod
-kubectl exec -it -n litellm deployment/litellm-ui -- sh
-curl http://litellm:4000/health
-
-# Verify service
-kubectl get svc litellm -n litellm
+oc get pods -n litellm
+oc describe pod <pod-name> -n litellm
 ```
 
-### Image Pull Errors
-
+### View Logs
 ```bash
-# For OpenShift internal registry, ensure build completed
-oc get build -n litellm
-oc logs -f build/litellm-ui-1 -n litellm
-
-# For external registry, check image pull secrets
-kubectl get secret -n litellm
+make logs          # All services
+make logs-api      # LiteLLM only
+make logs-ui       # Streamlit UI only
 ```
 
-### Pods Not Starting
-
+### Test Database Connection
 ```bash
-# Check events
-kubectl get events -n litellm --sort-by='.lastTimestamp'
-
-# Describe pod
-kubectl describe pod -n litellm <pod-name>
-
-# Check logs
-kubectl logs -n litellm <pod-name>
+oc exec -it deployment/litellm -n litellm -- env | grep DATABASE
 ```
-
-## Cleanup
-
-### Remove Everything
-
-```bash
-# Uninstall Helm release
-helm uninstall litellm --namespace litellm
-
-# Delete namespace
-kubectl delete namespace litellm
-```
-
-### Remove Only UI
-
-```bash
-helm upgrade litellm . \
-  --namespace litellm \
-  --set ui.enabled=false
-```
-
-## Architecture
-
-```
-┌─────────────────────────────────────────┐
-│         Kubernetes Namespace            │
-│              (litellm)                  │
-│                                         │
-│  ┌──────────────┐    ┌──────────────┐ │
-│  │   LiteLLM    │    │  UI (8501)   │ │
-│  │   (4000)     │◄───│  Streamlit   │ │
-│  └──────┬───────┘    └──────┬───────┘ │
-│         │                    │         │
-│    ┌────▼────┐          ┌───▼────┐    │
-│    │ Service │          │Service │    │
-│    └────┬────┘          └───┬────┘    │
-│         │                   │          │
-│    ┌────▼────┐         ┌───▼────┐     │
-│    │  Route  │         │ Route  │     │
-│    └────┬────┘         └───┬────┘     │
-└─────────┼──────────────────┼──────────┘
-          │                  │
-     https://litellm    https://ui
-          │                  │
-    ┌─────▼──────────────────▼─────┐
-    │      External Users          │
-    └──────────────────────────────┘
-```
-
-## Next Steps
-
-1. **Add Authentication**: Configure API keys or OAuth
-2. **Add More Models**: Edit `values.yaml` to add model configurations
-3. **Set Up Monitoring**: Add Prometheus/Grafana
-4. **Configure Autoscaling**: Enable HPA for production
-5. **Set Up CI/CD**: Automate builds and deployments
-6. **Add Persistent Storage**: For logs and caching
-
-## Support
-
-For issues:
-1. Check pod logs: `kubectl logs -n litellm <pod-name>`
-2. Check events: `kubectl get events -n litellm`
-3. Verify configuration: `helm get values litellm -n litellm`
-4. Review documentation: `helm/README.md`
-

@@ -1,0 +1,6 @@
+dependencies:
+- name: pgvector
+  repository: file://charts/pgvector
+  version: 0.5.2
+digest: sha256:67317231f7c9d23a003163e5fbe2cb5ef532cff61883db08cc7b0e7d861f1a23
+generated: "2025-12-23T10:19:06.018519-05:00"

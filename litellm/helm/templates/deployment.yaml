@@ -4,6 +4,7 @@ metadata:
   name: {{ include "litellm.fullname" . }}
   labels:
     {{- include "litellm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
@@ -11,6 +12,7 @@ spec:
   selector:
     matchLabels:
       {{- include "litellm.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
   template:
     metadata:
       annotations:
@@ -20,6 +22,7 @@ spec:
       {{- end }}
       labels:
         {{- include "litellm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -28,6 +31,21 @@ spec:
       serviceAccountName: {{ include "litellm.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.pgvector.enabled }}
+      initContainers:
+      - name: wait-for-postgres
+        image: busybox:1.36
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for PostgreSQL at pgvector:5432..."
+          until nc -z pgvector 5432; do
+            echo "PostgreSQL not ready, waiting..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+      {{- end }}
       containers:
       - name: {{ .Chart.Name }}
         securityContext:
@@ -43,6 +61,57 @@ spec:
         - "4000"
         {{- if .Values.litellm.debug }}
         - --debug
+        {{- end }}
+        {{- if not .Values.litellm.requireApiKey }}
+        - --no-auth
+        {{- end }}
+        env:
+        # OpenShift/non-root container compatibility
+        # These ensure npm, prisma, and other tools can write to writable directories
+        - name: HOME
+          value: /tmp
+        - name: NPM_CONFIG_CACHE
+          value: /tmp/.npm
+        - name: NPM_CONFIG_PREFIX
+          value: /tmp/.npm-global
+        - name: PRISMA_BINARY_CACHE_DIR
+          value: /tmp/.prisma
+        - name: PRISMA_CLI_ENGINE_TMP_DIR
+          value: /tmp/.prisma
+        - name: PIP_CACHE_DIR
+          value: /tmp/.cache/pip
+        - name: UV_CACHE_DIR
+          value: /tmp/.cache/uv
+        # LiteLLM authentication keys (required when using database)
+        - name: LITELLM_MASTER_KEY
+          value: {{ .Values.litellm.masterKey | quote }}
+        {{- if .Values.litellm.salt }}
+        - name: LITELLM_SALT_KEY
+          value: {{ .Values.litellm.salt | quote }}
+        {{- end }}
+        {{- if .Values.pgvector.enabled }}
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: password
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: pgvector
+              key: port
+        - name: DATABASE_URL
+          value: "postgresql://{{ .Values.pgvector.secret.user }}:{{ .Values.pgvector.secret.password }}@{{ .Values.pgvector.secret.host }}:{{ .Values.pgvector.secret.port }}/{{ .Values.pgvector.secret.dbname }}"
         {{- end }}
         ports:
         - name: http

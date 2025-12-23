@@ -1,0 +1,7 @@
+apiVersion: v2
+name: pgvector
+description: PostgreSQL with pgvector extension for LiteLLM
+type: application
+version: 0.5.2
+appVersion: "0.5.2"
+

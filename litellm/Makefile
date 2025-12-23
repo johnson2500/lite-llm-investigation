@@ -50,8 +50,13 @@ build-ui:
 	@echo "Building UI container image..."
 ifeq ($(USE_OPENSHIFT),true)
 	@echo "Using OpenShift build..."
+	@# Ensure namespace exists before creating build config
+	@$(KUBE_CMD) create namespace $(NAMESPACE) --dry-run=client -o yaml | $(KUBE_CMD) apply -f -
+	@# Create build config if it doesn't exist (ignore errors if it already exists)
 	@cd $(UI_SOURCE_DIR) && \
-		oc new-build --name litellm-ui --binary --strategy docker --to litellm-ui:$(UI_IMAGE_TAG) -n $(NAMESPACE) 2>/dev/null || true
+		oc get buildconfig litellm-ui -n $(NAMESPACE) >/dev/null 2>&1 || \
+		oc new-build --name litellm-ui --binary --strategy docker --to litellm-ui:$(UI_IMAGE_TAG) -n $(NAMESPACE)
+	@# Start the build
 	@cd $(UI_SOURCE_DIR) && \
 		oc start-build litellm-ui --from-dir=. --follow -n $(NAMESPACE)
 else
@@ -70,7 +75,7 @@ ifeq ($(USE_OPENSHIFT),true)
 	@helm upgrade --install $(RELEASE_NAME) $(HELM_CHART) \
 		--namespace $(NAMESPACE) \
 		--set ui.enabled=true \
-		--set ui.image.repository=image-registry.openshift-image-registry.svc:5000/$(NAMESPACE)/litellm-ui \
+		--set ui.image.repository=quay.io/rh-ee-rjjohnso/test \
 		--set ui.image.tag=$(UI_IMAGE_TAG) \
 		--wait
 else

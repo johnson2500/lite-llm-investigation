@@ -46,6 +46,22 @@ spec:
             configMapKeyRef:
               name: {{ include "litellm.fullname" . }}-ui-config
               key: LITELLM_URL
+        - name: LITELLM_STARTUP_DELAY
+          value: "20s"
+        - name: LITELLM_SUPPRESS_AUTH_ERRORS
+          value: "true"
+        - name: LITELLM_API_KEY
+          value: {{ .Values.litellm.apiKey | quote }}
+        - name: LITELLM_SALT
+          value: {{ .Values.litellm.salt | quote }}
+        - name: LITELLM_MASTER_KEY
+          value: {{ .Values.litellm.masterKey | quote }}
+        - name: LITELLM_MODE
+          value: "proxy"
+        - name: UI_USERNAME
+          value: {{ .Values.ui.username | quote }}
+        - name: UI_PASSWORD
+          value: {{ .Values.ui.password | quote }}
         livenessProbe:
           {{- toYaml .Values.ui.livenessProbe | nindent 12 }}
         readinessProbe:
