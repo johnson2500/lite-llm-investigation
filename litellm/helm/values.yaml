@@ -53,7 +53,13 @@ litellm:
       - model_name: llama3
         litellm_params:
           model: ollama/llama3
-          api_base: http://host.containers.internal:11434
+          api_base: http://ollama:11434
+      
+      - model_name: llama-fp8
+        litellm_params:
+          model: openai/llama-fp8
+          api_base: http://llama-fp8-predictor.hacohen-llmlite.svc.cluster.local:8080/v1
+          api_key: "none"  # Add this - tells LiteLLM no auth needed for this backend
 
 # Streamlit UI (your custom UI app)
 ui:
