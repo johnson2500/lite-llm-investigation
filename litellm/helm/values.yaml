@@ -63,6 +63,15 @@ litellm:
           input_cost_per_token: 0.00001   # $0.01 per 1K input tokens
           output_cost_per_token: 0.00002  # $0.02 per 1K output tokens
 
+    # Fallback routing: when llama-fp8 fails, route to llama3
+    router_settings:
+      fallbacks:
+        - "llama-fp8": ["llama3"]
+      num_retries: 0           # Don't retry, failover immediately
+      timeout: 30               # 5 second timeout (default is 600)
+      allowed_fails: 1
+      cooldown_time: 10
+
 # Streamlit UI (your custom UI app)
 ui:
   enabled: true
