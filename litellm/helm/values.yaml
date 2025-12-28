@@ -68,7 +68,7 @@ litellm:
       fallbacks:
         - "llama-fp8": ["llama3"]
       num_retries: 0           # Don't retry, failover immediately
-      timeout: 15               # 15 second timeout
+      timeout: 30               # 30 second timeout
       allowed_fails: 1
       cooldown_time: 10
 
