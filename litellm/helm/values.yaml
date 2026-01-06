@@ -53,7 +53,24 @@ litellm:
       - model_name: llama3
         litellm_params:
           model: ollama/llama3
-          api_base: http://host.containers.internal:11434
+          api_base: http://ollama:11434
+      
+      - model_name: llama-fp8
+        litellm_params:
+          model: openai/llama-fp8
+          api_base: http://llama-fp8-predictor.hacohen-llmlite.svc.cluster.local:8080/v1
+          api_key: "none"  # Add this - tells LiteLLM no auth needed for this backend
+          input_cost_per_token: 0.00001   # $0.01 per 1K input tokens
+          output_cost_per_token: 0.00002  # $0.02 per 1K output tokens
+
+    # Fallback routing: when llama-fp8 fails, route to llama3
+    router_settings:
+      fallbacks:
+        - "llama-fp8": ["llama3"]
+      num_retries: 0           # Don't retry, failover immediately
+      timeout: 30               # 30 second timeout
+      allowed_fails: 1
+      cooldown_time: 10
 
 # Streamlit UI (your custom UI app)
 ui:
